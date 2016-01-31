@@ -20,7 +20,11 @@ After you added it to your plugin list, it will be pulled by rebar3 when necessa
 
 ### Latest version from [hex.pm](http://hex.pm/)
 
-Not available so far but planned.
+Add the plugin to your rebar config:
+
+```erl
+{plugins, [{rebar3_autotest, "0.1.1"}]}.
+```
 
 ### Latest version from [github](https://github.com/NobbZ/rebar3_autotest)
 
