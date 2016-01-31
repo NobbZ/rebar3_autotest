@@ -1,0 +1,16 @@
+{application, rebar3_autotest,
+  [{description, "A rebar3 plugin to run tests automatically when there are changes."},
+    {vsn, "0.0.1"},
+    {registered, []},
+    {applications,
+      [kernel,
+        stdlib,
+        enotify
+      ]},
+    {env, []},
+    {modules, []},
+
+    {maintainers, ["Norbert Melzer"]},
+    {licenses, ["MIT"]},
+    {links, [{"Github", "https://github.com/NobbZ/rebar3_autotest"}]}
+  ]}.
