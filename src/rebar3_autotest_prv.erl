@@ -24,7 +24,8 @@ init(State) ->
     {example, "rebar3 autotest"}, % How to use the plugin
     {opts, ?OPTS},                % list of options understood by the plugin
     {short_desc, ?DESCRIPTION},
-    {desc, ?DESCRIPTION}
+    {desc, ?DESCRIPTION},
+    {profile, test}
   ]),
   {ok, rebar_state:add_provider(State, Provider)}.
 
