@@ -1,6 +1,10 @@
 -module(rebar3_autotest_prv).
 
+-behaviour(provider).
+
 -export([init/1, do/1, format_error/1]).
+
+-export([auto/0, flush/0]).
 
 -define(DESCRIPTION, "A rebar3 plugin to run tests automatically when there are changes.").
 -define(PROVIDER, autotest).
@@ -29,7 +33,7 @@ init(State) ->
 do(State) ->
   spawn(fun() ->
     listen_on_project_apps(State),
-    auto()
+    ?MODULE:auto()
   end),
   State1 = remove_from_plugin_paths(State),
   {ok, State1}.
@@ -68,7 +72,7 @@ auto() ->
     undefined ->
       ?MODULE:auto();
     _ ->
-      flush(),
+      ?MODULE:flush(),
       receive
         _Msg ->
           ok
@@ -78,6 +82,6 @@ auto() ->
   end.
 
 flush() ->
-  receive _ -> flush()
+  receive _ -> ?MODULE:flush()
   after 0 -> ok
   end.
