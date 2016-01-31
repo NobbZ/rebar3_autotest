@@ -53,9 +53,11 @@ listen_on_project_apps(State) ->
     SrcDir = filename:join(rebar_app_info:dir(AppInfo), "src"),
     IncDir = filename:join(rebar_app_info:dir(AppInfo), "include"),
     TstDir = filename:join(rebar_app_info:dir(AppInfo), "test"),
+    PrvDir = filename:join(rebar_app_info:dir(AppInfo), "priv"),
     enotify:start_link(SrcDir),
     enotify:start_link(IncDir),
-    enotify:start_link(TstDir)
+    enotify:start_link(TstDir),
+    enotify:start_link(PrvDir)
   end, ProjectApps).
 
 remove_from_plugin_paths(State) ->
