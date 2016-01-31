@@ -80,7 +80,11 @@ auto() ->
         _Msg ->
           ok
       end,
-      rebar_agent:do(eunit),
+      try rebar_agent:do(eunit) of
+        _ -> ok
+      catch
+        Thrown -> io:format(standard_error, "Caught: ~p~n", [Thrown]), also_ok
+      end,
       ?MODULE:auto()
   end.
 
