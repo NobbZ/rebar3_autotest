@@ -59,4 +59,5 @@ $ rebar3 autotest
 While it is running, it will restart `rebar3`'s `eunit` command whenever files below `src`, `include`, `priv`, or `test`
 have changed.
 
-You can stop it by pressing `CTRL`-`C` twice.
+You can stop it by pressing `CTRL`-`C` twice, or since it is running in an REPL-process, just enter `q().` as you would
+in `erl`.
