@@ -37,7 +37,7 @@ do(State) ->
     ?MODULE:auto()
   end),
   State1 = remove_from_plugin_paths(State),
-  rebar_prv_eunit:do(State1). %{ok, State1}.
+  rebar_prv_shell:do(State1). %{ok, State1}.
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
