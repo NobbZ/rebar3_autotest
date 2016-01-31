@@ -2,6 +2,7 @@
 
 -export([init/1, do/1, format_error/1]).
 
+-define(DESCRIPTION, "A rebar3 plugin to run tests automatically when there are changes.").
 -define(PROVIDER, autotest).
 -define(DEPS, [app_discovery]).
 -define(OPTS, []).
@@ -11,7 +12,6 @@
 %% ===================================================================
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-  {ok, Description} = application:get_key(description),
   Provider = providers:create([
     {name, ?PROVIDER},            % The 'user friendly' name of the task
     {module, ?MODULE},            % The module implementation of the task
@@ -19,8 +19,8 @@ init(State) ->
     {deps, ?DEPS},                % The list of dependencies
     {example, "rebar3 autotest"}, % How to use the plugin
     {opts, ?OPTS},                % list of options understood by the plugin
-    {short_desc, Description},
-    {desc, Description}
+    {short_desc, ?DESCRIPTION},
+    {desc, ?DESCRIPTION}
   ]),
   {ok, rebar_state:add_provider(State, Provider)}.
 
