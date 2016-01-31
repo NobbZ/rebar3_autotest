@@ -1,4 +1,4 @@
--module(myplugin_prv).
+-module(rebar3_autotest_prv).
 
 -export([init/1, do/1, format_error/1]).
 
