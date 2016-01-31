@@ -23,7 +23,7 @@ After you added it to your plugin list, it will be pulled by rebar3 when necessa
 Add the plugin to your rebar config:
 
 ```erl
-{plugins, [{rebar3_autotest, "0.1.0"}]}.
+{plugins, [{rebar3_autotest, "0.1.1"}]}.
 ```
 
 ### Latest version from [github](https://github.com/NobbZ/rebar3_autotest)
