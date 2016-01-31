@@ -8,7 +8,7 @@
 
 -define(DESCRIPTION, "A rebar3 plugin to run tests automatically when there are changes.").
 -define(PROVIDER, autotest).
--define(DEPS, [app_discovery]).
+-define(DEPS, [app_discovery, eunit]).
 -define(OPTS, []).
 
 %% ===================================================================
