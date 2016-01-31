@@ -1,6 +1,6 @@
 {application, rebar3_autotest,
   [{description, "A rebar3 plugin to run tests automatically when there are changes."},
-    {vsn, "0.0.1"},
+    {vsn, "0.1.0"},
     {registered, []},
     {applications,
       [kernel,

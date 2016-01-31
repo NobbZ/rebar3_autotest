@@ -28,7 +28,7 @@ Add the plugin to your rebar config:
 
 ```erl
 {plugins, [
-  {rebar3_autotest, ".*", {git, "https://github.com/NobbZ/rebar3_autotest.git", {branch, "master"}}}
+  {rebar3_autotest, "0\.1\..*", {git, "https://github.com/NobbZ/rebar3_autotest.git", {branch, "master"}}}
 ]}.
 ```
 
