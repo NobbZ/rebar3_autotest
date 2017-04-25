@@ -4,12 +4,20 @@
 
 -export([init/1, do/1, format_error/1]).
 
--export([auto/0, flush/0]).
-
 -define(DESCRIPTION, "A rebar3 plugin to run tests automatically when there are changes.").
 -define(PROVIDER, autotest).
--define(DEPS, [app_discovery, eunit]).
+-define(DEPS, [app_discovery]).
 -define(OPTS, []).
+-define(INCLUDE_FILE_PATTERNS, [
+  "\\A.+\\.erl\\z",
+  "\\A.+\\.hrl\\z",
+  "\\A.+\\.app\\.src\\z",
+  "\\A.+\\.app\\z",
+  "\\A.+\\.ex\\z",
+  "\\A.+\\.exs\\z",
+  "\\A.+\\.yaws\\z",
+  "\\A.+\\.xrl\\z"
+]).
 
 %% ===================================================================
 %% Public API
@@ -32,12 +40,12 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-  spawn(fun() ->
-    listen_on_project_apps(State),
-    ?MODULE:auto()
-  end),
   State1 = remove_from_plugin_paths(State),
-  rebar_prv_shell:do(State1). %{ok, State1}.
+  spawn_link(fun() ->
+    listen_on_project_apps(State1),
+    auto_first()
+  end),
+  rebar_prv_shell:do(State1). % pesky shell. Looks like rebar_agent can't currently start itself. :(
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
@@ -70,25 +78,94 @@ remove_from_plugin_paths(State) ->
   end, PluginPaths),
   rebar_state:code_paths(State, all_plugin_deps, PluginsMinusAutotest).
 
-auto() ->
-  case whereis(rebar_agent) of
-    undefined ->
-      ?MODULE:auto();
-    _ ->
-      ?MODULE:flush(),
-      receive
-        _Msg ->
-          ok
+substr(String, {Offset, Length}) ->
+  string:substr(String, Offset+1, Length).
+
+eunit_output_to_notification_message(Output) ->
+  case re:run(Output, "^Finished in (\\d+\\.\\d+) seconds$", [global, multiline]) of
+    {match, TimeMatches} ->
+      Time = substr(Output, lists:last(lists:last(TimeMatches))),
+      {match, ResultMatches} = case re:run(Output, "\\d+ tests, \\d+ failures, \\d+ skips$", [global, multiline]) of
+        M = {match, _} -> M;
+        nomatch ->
+          re:run(Output, "\\d+ tests, \\d+ failures$", [global, multiline])
       end,
-      try rebar_agent:do(eunit) of
-        _ -> ok
-      catch
-        Type:Thrown -> io:format(standard_error, "Caught: ~p:~p~n", [Type, Thrown]), also_ok
-      end,
-      ?MODULE:auto()
+      Results = substr(Output, hd(lists:last(ResultMatches))),
+      io_lib:format("~s in ~s seconds", [Results, Time]);
+    nomatch ->
+      "Compilation error(s)"
   end.
 
-flush() ->
-  receive _ -> ?MODULE:flush()
-  after 0 -> ok
+run_eunit() ->
+  Rebar3AbsPath = os:find_executable("rebar3"),
+  Port = open_port({spawn_executable, Rebar3AbsPath}, [
+                                                binary,
+                                                {line, 1024},
+                                                exit_status,
+                                                hide,
+                                                stderr_to_stdout,
+                                                {arg0, "rebar3"},
+                                                {args, ["eunit"]}
+                                               ]),
+  {ExitCode, Output} = capture_eunit_output(Port, <<>>),
+  Icon = if
+    ExitCode =:= 0 -> "ok";
+    true -> "error"
+  end,
+  Msg = eunit_output_to_notification_message(Output),
+  notify(Icon, Msg).
+
+capture_eunit_output(Port, Output) ->
+  receive
+    {Port, {data, {noeol, NewOutput}}} ->
+      file:write(standard_error, NewOutput),
+      capture_eunit_output(Port, <<Output/binary, NewOutput/binary>>);
+    {Port, {data, {eol, NewOutput}}} ->
+      file:write(standard_error, NewOutput),
+      io:format(standard_error, "~n", []),
+      capture_eunit_output(Port, <<Output/binary, NewOutput/binary, "\n">>);
+    {Port, {exit_status, Status}} ->
+      {Status, unicode:characters_to_list(Output)}
+  end.
+
+-spec
+should_check(Event) -> boolean() when
+    Event :: {AbsPathFile, Attributes},
+    AbsPathFile :: string(),
+    Attributes :: [atom()].
+should_check({AbsPathFile, _Attributes}) ->
+  IncludeREs = lists:map(fun(S) -> {ok, MP} = re:compile(S), MP end, ?INCLUDE_FILE_PATTERNS),
+  FileName = filename:basename(AbsPathFile),
+  lists:any(fun(RE) -> re:run(FileName, RE) =/= nomatch end, IncludeREs).
+
+auto_first() ->
+  case whereis(rebar_agent) of
+    undefined ->
+      timer:sleep(25),
+      auto_first();
+    _ ->
+      run_eunit(),
+      auto()
+  end.
+
+auto() ->
+  receive 
+     Event = {AbsPathFile, Attributes} when is_list(AbsPathFile) and is_list(Attributes) ->
+      case should_check(Event) of
+        true -> run_eunit();
+        _Else -> skip
+      end,
+      auto()
+  end.
+
+notify(IconName, Message) ->
+  case os:find_executable("terminal-notifier") of
+    false ->
+      skipped;
+    Exe ->
+      PluginPrivDir = code:priv_dir(rebar3_autotest),
+      IconPath = filename:join([PluginPrivDir, "icons", IconName]) ++ ".icns",
+      Cmd = io_lib:format("'~s' '-title' 'EUnit' '-message' '~s' '-appIcon' '~s'", [Exe, Message, IconPath]),
+      os:cmd(Cmd),
+      ok
   end.
