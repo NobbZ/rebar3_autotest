@@ -4,7 +4,7 @@
 
 -export([init/1, do/1, format_error/1]).
 
--export([auto/0, flush/0]).
+-export([auto/0, flush/0, notify/2]).
 
 -define(DESCRIPTION, "A rebar3 plugin to run tests automatically when there are changes.").
 -define(PROVIDER, autotest).
@@ -81,7 +81,15 @@ auto() ->
           ok
       end,
       try rebar_agent:do(eunit) of
-        _ -> ok
+        ok ->
+          ?MODULE:notify("ok", "0 failures");
+        {error, {rebar_prv_eunit, Error}} ->
+          ErrorMessage = rebar_prv_eunit:format_error(Error),
+          ?MODULE:notify("error", ErrorMessage);
+        Else ->
+          io:format(standard_error, "Unknown error: ~p~n", [Else]),
+          ?MODULE:notify("error", "Unknown error"),
+          else_ok
       catch
         Type:Thrown -> io:format(standard_error, "Caught: ~p:~p~n", [Type, Thrown]), also_ok
       end,
@@ -91,4 +99,16 @@ auto() ->
 flush() ->
   receive _ -> ?MODULE:flush()
   after 0 -> ok
+  end.
+
+notify(IconName, Message) ->
+  case os:find_executable("terminal-notifier") of
+    false ->
+      skipped;
+    Exe ->
+      PluginPrivDir = code:priv_dir(rebar3_autotest),
+      IconPath = filename:join([PluginPrivDir, "icons", IconName]) ++ ".icns",
+      Cmd = io_lib:format("'~s' '-title' 'EUnit' '-message' '~s' '-appIcon' '~s'", [Exe, Message, IconPath]),
+      os:cmd(Cmd),
+      ok
   end.
