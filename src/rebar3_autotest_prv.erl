@@ -4,11 +4,11 @@
 
 -export([init/1, do/1, format_error/1]).
 
--export([auto/0, flush/0]).
+-export([auto/0, auto_first/0, flush/0, run_eunit/0]).
 
 -define(DESCRIPTION, "A rebar3 plugin to run tests automatically when there are changes.").
 -define(PROVIDER, autotest).
--define(DEPS, [app_discovery, eunit]).
+-define(DEPS, [app_discovery]).
 -define(OPTS, []).
 
 %% ===================================================================
@@ -34,10 +34,11 @@ init(State) ->
 do(State) ->
   spawn(fun() ->
     listen_on_project_apps(State),
-    ?MODULE:auto()
+    ?MODULE:auto_first()
   end),
   State1 = remove_from_plugin_paths(State),
-  rebar_prv_shell:do(State1). %{ok, State1}.
+  {ok, State2} = rebar_prv_eunit:init(State1),
+  rebar_prv_shell:do(State2).
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
@@ -70,23 +71,28 @@ remove_from_plugin_paths(State) ->
   end, PluginPaths),
   rebar_state:code_paths(State, all_plugin_deps, PluginsMinusAutotest).
 
-auto() ->
+run_eunit() ->
+  try rebar_agent:do(eunit) of
+    _ -> ok
+  catch
+    Type:Thrown -> io:format(standard_error, "Caught: ~p:~p~n", [Type, Thrown]), also_ok
+  end.
+
+auto_first() ->
   case whereis(rebar_agent) of
     undefined ->
-      ?MODULE:auto();
+      ?MODULE:auto_first();
     _ ->
       ?MODULE:flush(),
-      receive
-        _Msg ->
-          ok
-      end,
-      try rebar_agent:do(eunit) of
-        _ -> ok
-      catch
-        Type:Thrown -> io:format(standard_error, "Caught: ~p:~p~n", [Type, Thrown]), also_ok
-      end,
+      ?MODULE:run_eunit(),
       ?MODULE:auto()
   end.
+
+auto() ->
+  ?MODULE:flush(),
+  receive _Msg -> ok end,
+  ?MODULE:run_eunit(),
+  ?MODULE:auto().
 
 flush() ->
   receive _ -> ?MODULE:flush()
