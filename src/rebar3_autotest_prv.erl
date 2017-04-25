@@ -4,12 +4,22 @@
 
 -export([init/1, do/1, format_error/1]).
 
--export([auto/0, flush/0]).
+-export([auto/0, flush/0, should_check/1]).
 
 -define(DESCRIPTION, "A rebar3 plugin to run tests automatically when there are changes.").
 -define(PROVIDER, autotest).
 -define(DEPS, [app_discovery, eunit]).
 -define(OPTS, []).
+-define(INCLUDE_FILE_PATTERNS, [
+  "\\A.+\\.erl\\z",
+  "\\A.+\\.hrl\\z",
+  "\\A.+\\.app\\.src\\z",
+  "\\A.+\\.app\\z",
+  "\\A.+\\.ex\\z",
+  "\\A.+\\.exs\\z",
+  "\\A.+\\.yaws\\z",
+  "\\A.+\\.xrl\\z"
+]).
 
 %% ===================================================================
 %% Public API
@@ -70,20 +80,31 @@ remove_from_plugin_paths(State) ->
   end, PluginPaths),
   rebar_state:code_paths(State, all_plugin_deps, PluginsMinusAutotest).
 
+-spec
+should_check(Event) -> boolean() when
+    Event :: {AbsPathFile, Attributes},
+    AbsPathFile :: string(),
+    Attributes :: [atom()].
+should_check(_Event = {AbsPathFile, _Attributes}) ->
+  IncludeREs = lists:map(fun(S) -> {ok, MP} = re:compile(S), MP end, ?INCLUDE_FILE_PATTERNS),
+  FileName = filename:basename(AbsPathFile),
+  lists:any(fun(RE) -> re:run(FileName, RE) =/= nomatch end, IncludeREs).
+
 auto() ->
   case whereis(rebar_agent) of
     undefined ->
       ?MODULE:auto();
     _ ->
       ?MODULE:flush(),
-      receive
-        _Msg ->
-          ok
-      end,
-      try rebar_agent:do(eunit) of
-        _ -> ok
-      catch
-        Type:Thrown -> io:format(standard_error, "Caught: ~p:~p~n", [Type, Thrown]), also_ok
+      Event = receive _Msg -> _Msg end,
+      case ?MODULE:should_check(Event) of
+        true ->
+          try rebar_agent:do(eunit) of
+            _ -> ok
+          catch
+            Type:Thrown -> io:format(standard_error, "Caught: ~p:~p~n", [Type, Thrown]), also_ok
+          end;
+        _Else -> skip
       end,
       ?MODULE:auto()
   end.
